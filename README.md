@@ -17,6 +17,7 @@ A lightweight, professional macOS utility that gives you instant keyboard backli
 
 ## ✨ Features
 
+- **⏰ Schedule Time (Day & Night)**: Automatically turn off the keyboard backlight during the day to save battery, and automatically restore your preferred brightness at night. Fully customizable hours with instant live status.
 - **⚡ Zero-Latency Hotkeys**: Instantaneous brightness adjustment with Carbon hardware-level hotkeys (`RegisterEventHotKey`). Zero polling, zero lag.
 - **🎛️ Assign Any Key or Combo**: Customize shortcuts to **any** key (e.g. single keys `O`, `P`, or modifier combinations like `⌥O`, `⌥P`, `⌘⌥O`, etc.).
 - **🖥️ Native macOS Bezel (HUD)**: GPU-accelerated translucent Liquid Glass on-screen display overlay matching macOS volume/brightness bezels.

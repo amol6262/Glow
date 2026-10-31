@@ -9,6 +9,10 @@ struct SettingsView: View {
                 .tabItem {
                     Label("General", systemImage: "gearshape")
                 }
+            scheduleTab
+                .tabItem {
+                    Label("Schedule Time", systemImage: "clock.arrow.circlepath")
+                }
             hotkeysTab
                 .tabItem {
                     Label("Hotkeys", systemImage: "keyboard")
@@ -18,7 +22,7 @@ struct SettingsView: View {
                     Label("About", systemImage: "info.circle")
                 }
         }
-        .frame(width: 440, height: 260)
+        .frame(width: 480, height: 320)
         .padding()
     }
 
@@ -47,6 +51,91 @@ struct SettingsView: View {
                     Toggle("Show HUD overlay when adjusting via hotkeys", isOn: $model.showOSD)
                         .toggleStyle(.checkbox)
                 }
+            }
+        }
+        .padding(8)
+    }
+
+    // MARK: - Schedule Time Tab
+
+    private var scheduleTab: some View {
+        Form {
+            Section {
+                Toggle("Enable Schedule Time", isOn: $model.scheduleEnabled)
+                    .font(.headline)
+
+                Text("Automatically turns off keyboard backlight during the day to save battery, and restores your previous brightness level at night.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 6)
+
+                Divider()
+
+                LabeledContent("Turn Off at (Day):") {
+                    DatePicker(
+                        "",
+                        selection: Binding(
+                            get: { model.dayDate },
+                            set: { model.dayDate = $0 }
+                        ),
+                        displayedComponents: .hourAndMinute
+                    )
+                    .labelsHidden()
+                    .disabled(!model.scheduleEnabled)
+                }
+
+                LabeledContent("Restore at (Night):") {
+                    DatePicker(
+                        "",
+                        selection: Binding(
+                            get: { model.nightDate },
+                            set: { model.nightDate = $0 }
+                        ),
+                        displayedComponents: .hourAndMinute
+                    )
+                    .labelsHidden()
+                    .disabled(!model.scheduleEnabled)
+                }
+
+                LabeledContent("Restored Level:") {
+                    HStack(spacing: 8) {
+                        Text("\(Int(round(model.savedBrightness * 100)))%")
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.medium)
+                        Text("• Updates automatically when you adjust brightness")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Schedule Live Status Banner
+                HStack(spacing: 8) {
+                    if model.scheduleEnabled {
+                        if model.isCurrentlyDay {
+                            Image(systemName: "sun.max.fill")
+                                .foregroundStyle(.orange)
+                            Text("Daytime active: Backlight is turned off until \(model.nightTimeString)")
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                        } else {
+                            Image(systemName: "moon.stars.fill")
+                                .foregroundStyle(.indigo)
+                            Text("Nighttime active: Backlight restored to \(Int(round(model.savedBrightness * 100)))% until \(model.dayTimeString)")
+                                .font(.caption)
+                                .foregroundStyle(.primary)
+                        }
+                    } else {
+                        Image(systemName: "pause.circle.fill")
+                            .foregroundStyle(.secondary)
+                        Text("Schedule Time is paused. Backlight remains manual.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
+                .background(Color.secondary.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             }
         }
         .padding(8)

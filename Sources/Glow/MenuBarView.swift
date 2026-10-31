@@ -6,18 +6,32 @@ struct MenuBarView: View {
     var onQuit: () -> Void
 
     var body: some View {
-        VStack(spacing: 14) {
-            // Header: Title & Percentage
+        VStack(spacing: 12) {
+            // Header: Title, Power Toggle & Percentage
             HStack(spacing: 8) {
-                Image(systemName: "keyboard.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
+                Button(action: {
+                    model.togglePower()
+                }) {
+                    Image(systemName: model.brightness > 0.02 ? "keyboard.fill" : "keyboard")
+                        .font(.system(size: 15))
+                        .foregroundStyle(model.brightness > 0.02 ? Color.accentColor : Color.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(model.brightness > 0.02 ? "Click to turn off backlight" : "Click to restore previous brightness")
+
                 Text("Keyboard Brightness")
                     .font(.system(size: 13, weight: .semibold))
+
                 Spacer()
-                Text("\(Int(round(model.brightness * 100)))%")
-                    .font(.system(size: 14, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(.primary)
+
+                Button(action: {
+                    model.togglePower()
+                }) {
+                    Text(model.brightness > 0.02 ? "\(Int(round(model.brightness * 100)))%" : "Off")
+                        .font(.system(size: 14, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(model.brightness > 0.02 ? Color.primary : Color.secondary)
+                }
+                .buttonStyle(.plain)
             }
 
             // Apple Control Center Style Interactive Slider
@@ -76,13 +90,58 @@ struct MenuBarView: View {
             }
             .frame(height: 34)
 
-            // Preset Buttons (Off, 25%, 50%, 75%, 100%)
+            // Preset Buttons (Off, 25%, 50%, 75%, Max)
             HStack(spacing: 5) {
                 presetButton(title: "Off", value: 0.0)
                 presetButton(title: "25%", value: 0.25)
                 presetButton(title: "50%", value: 0.50)
                 presetButton(title: "75%", value: 0.75)
                 presetButton(title: "Max", value: 1.0)
+            }
+
+            // Schedule Time Feature Card
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Image(systemName: model.scheduleEnabled
+                          ? (model.isCurrentlyDay ? "sun.max.fill" : "moon.stars.fill")
+                          : "clock.arrow.circlepath")
+                        .font(.system(size: 13))
+                        .foregroundStyle(model.scheduleEnabled
+                                         ? (model.isCurrentlyDay ? Color.orange : Color.indigo)
+                                         : Color.secondary)
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Schedule Time")
+                            .font(.system(size: 12, weight: .medium))
+
+                        if model.scheduleEnabled {
+                            if model.isCurrentlyDay {
+                                Text("☀️ Off (Day) • Restores at \(model.nightTimeString)")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("🌙 Restored (\(Int(round(model.savedBrightness * 100)))%) • Off at \(model.dayTimeString)")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            Text("Off during day • Restored at night")
+                                .font(.system(size: 10))
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
+                    Spacer()
+
+                    Toggle("", isOn: $model.scheduleEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.mini)
+                        .labelsHidden()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(Color.secondary.opacity(0.07))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
 
             if !model.isAvailable {
@@ -98,7 +157,7 @@ struct MenuBarView: View {
             Divider()
 
             // Active Shortcuts Info
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text("Decrease Brightness")
                         .font(.caption)
@@ -137,13 +196,21 @@ struct MenuBarView: View {
             }
         }
         .padding(14)
-        .frame(width: 270)
+        .frame(width: 280)
     }
 
     private func presetButton(title: String, value: Double) -> some View {
         let isSelected = abs(model.brightness - value) < 0.05
         return Button(action: {
-            model.setBrightness(value, triggerOSD: false)
+            if value == 0.0 {
+                // If user clicks Off, save current level so they can restore it
+                if model.brightness > 0.05 {
+                    model.savedBrightness = model.brightness
+                }
+                model.setBrightness(0.0, triggerOSD: false)
+            } else {
+                model.setBrightness(value, triggerOSD: false)
+            }
         }) {
             Text(title)
                 .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
