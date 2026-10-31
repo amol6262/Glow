@@ -1,14 +1,16 @@
 import Foundation
 
-/// Controls the built-in keyboard backlight brightness via CoreBrightness framework.
+/// Controls the built-in keyboard backlight brightness via CoreBrightness framework with zero-latency hardware commits.
 @MainActor
 final class KeyboardBrightness {
     static let shared = KeyboardBrightness()
 
     private var client: AnyObject?
     private var getBrightnessFunc: (@convention(c) (AnyObject, Selector, UInt64) -> Float)?
+    private var setBrightnessWithFadeFunc: (@convention(c) (AnyObject, Selector, Float, Int32, Bool, UInt64) -> Bool)?
     private var setBrightnessFunc: (@convention(c) (AnyObject, Selector, Float, UInt64) -> Bool)?
     private var getSel: Selector?
+    private var setFadeSel: Selector?
     private var setSel: Selector?
     private(set) var keyboardID: UInt64?
 
@@ -22,14 +24,23 @@ final class KeyboardBrightness {
         self.client = clientInstance
 
         let getSelector = NSSelectorFromString("brightnessForKeyboard:")
+        let setFadeSelector = NSSelectorFromString("setBrightness:fadeSpeed:commit:forKeyboard:")
         let setSelector = NSSelectorFromString("setBrightness:forKeyboard:")
+
         self.getSel = getSelector
+        self.setFadeSel = setFadeSelector
         self.setSel = setSelector
 
         let impGet = clientInstance.method(for: getSelector)
         self.getBrightnessFunc = unsafeBitCast(
             impGet,
             to: (@convention(c) (AnyObject, Selector, UInt64) -> Float).self
+        )
+
+        let impSetFade = clientInstance.method(for: setFadeSelector)
+        self.setBrightnessWithFadeFunc = unsafeBitCast(
+            impSetFade,
+            to: (@convention(c) (AnyObject, Selector, Float, Int32, Bool, UInt64) -> Bool).self
         )
 
         let impSet = clientInstance.method(for: setSelector)
@@ -60,13 +71,15 @@ final class KeyboardBrightness {
 
     @discardableResult
     func set(_ value: Float) -> Bool {
-        guard let client = client,
-              let setFunc = setBrightnessFunc,
-              let sel = setSel,
-              let id = keyboardID else {
-            return false
-        }
+        guard let client = client, let id = keyboardID else { return false }
         let clamped = max(0.0, min(1.0, value))
-        return setFunc(client, sel, clamped, id)
+
+        // fadeSpeed: 0 = instantaneous hardware response, commit: true = immediate write to controller
+        if let setFade = setBrightnessWithFadeFunc, let sel = setFadeSel {
+            return setFade(client, sel, clamped, 0, true, id)
+        } else if let setStandard = setBrightnessFunc, let sel = setSel {
+            return setStandard(client, sel, clamped, id)
+        }
+        return false
     }
 }

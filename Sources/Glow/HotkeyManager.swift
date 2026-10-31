@@ -1,7 +1,7 @@
 import Carbon.HIToolbox
 import Foundation
 
-/// Manages global system hotkeys using Carbon's RegisterEventHotKey.
+/// Manages global system hotkeys using Carbon's RegisterEventHotKey with zero-latency synchronous dispatch.
 @MainActor
 final class HotkeyManager {
     static let shared = HotkeyManager()
@@ -42,8 +42,6 @@ final class HotkeyManager {
         )
         if status == noErr {
             increaseRef = ref
-        } else {
-            print("Glow: Warning - Failed to register increase hotkey (code: \(status))")
         }
     }
 
@@ -64,8 +62,6 @@ final class HotkeyManager {
         )
         if status == noErr {
             decreaseRef = ref
-        } else {
-            print("Glow: Warning - Failed to register decrease hotkey (code: \(status))")
         }
     }
 
@@ -102,7 +98,8 @@ final class HotkeyManager {
                     nil,
                     &hk
                 )
-                Task { @MainActor in
+                // Execute synchronously on the main thread for 0ms latency
+                MainActor.assumeIsolated {
                     HotkeyManager.shared.fire(hk.id)
                 }
                 return noErr

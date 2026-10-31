@@ -16,10 +16,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(
+            let img = NSImage(
                 systemSymbolName: "keyboard",
                 accessibilityDescription: "Glow Keyboard Brightness"
             )
+            img?.isTemplate = true
+            button.image = img
             button.target = self
             button.action = #selector(statusItemClicked(_:))
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])

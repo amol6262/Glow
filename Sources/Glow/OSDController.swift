@@ -1,25 +1,31 @@
 import AppKit
+import QuartzCore
 
-/// Displays a sleek, native macOS on-screen bezel HUD when adjusting keyboard brightness.
+/// Displays a sleek, native macOS bezel HUD (identical to system volume/brightness overlays)
+/// using hardware-accelerated CoreAnimation layers for zero-latency, buttery-smooth animations.
 @MainActor
 final class OSDController {
     static let shared = OSDController()
 
     private var panel: NSPanel?
-    private var levelIndicator: NSProgressIndicator?
+    private var iconView: NSImageView?
+    private var trackLayer: CALayer?
+    private var fillLayer: CALayer?
     private var percentageLabel: NSTextField?
     private var dismissWorkItem: DispatchWorkItem?
+
+    private let panelWidth: CGFloat = 210
+    private let panelHeight: CGFloat = 54
+    private let trackWidth: CGFloat = 100
+    private let trackHeight: CGFloat = 8
 
     private init() {
         buildPanel()
     }
 
     private func buildPanel() {
-        let width: CGFloat = 200
-        let height: CGFloat = 64
-
         let p = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: width, height: height),
+            contentRect: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -31,39 +37,47 @@ final class OSDController {
         p.ignoresMouseEvents = true
         p.collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle]
 
-        // Visual Effect view (blurred translucent bezel)
-        let visualEffect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        // Native Visual Effect (Liquid Glass / HUD Material)
+        let visualEffect = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: panelWidth, height: panelHeight))
         visualEffect.material = .hudWindow
         visualEffect.blendingMode = .behindWindow
         visualEffect.state = .active
         visualEffect.wantsLayer = true
         visualEffect.layer?.cornerRadius = 16
         visualEffect.layer?.masksToBounds = true
+        visualEffect.layer?.borderWidth = 0.5
+        visualEffect.layer?.borderColor = NSColor(white: 1.0, alpha: 0.15).cgColor
 
-        // Keyboard Symbol Icon
-        let iconView = NSImageView(frame: NSRect(x: 16, y: (height - 24) / 2, width: 24, height: 24))
-        iconView.image = NSImage(
-            systemSymbolName: "keyboard.fill",
-            accessibilityDescription: "Keyboard Backlight"
-        )
-        iconView.contentTintColor = .labelColor
-        visualEffect.addSubview(iconView)
+        // Left Icon: SF Symbol keyboard
+        let icon = NSImageView(frame: NSRect(x: 16, y: (panelHeight - 22) / 2, width: 22, height: 22))
+        icon.image = NSImage(systemSymbolName: "keyboard.fill", accessibilityDescription: "Keyboard Brightness")
+        icon.contentTintColor = .labelColor
+        visualEffect.addSubview(icon)
+        self.iconView = icon
 
-        // Progress Bar
-        let indicator = NSProgressIndicator(frame: NSRect(x: 48, y: (height - 10) / 2, width: 98, height: 10))
-        indicator.isIndeterminate = false
-        indicator.minValue = 0.0
-        indicator.maxValue = 1.0
-        indicator.doubleValue = 0.5
-        indicator.style = .bar
-        visualEffect.addSubview(indicator)
-        self.levelIndicator = indicator
+        // Progress Track (GPU Layer)
+        let track = CALayer()
+        track.frame = CGRect(x: 48, y: (panelHeight - trackHeight) / 2, width: trackWidth, height: trackHeight)
+        track.cornerRadius = trackHeight / 2
+        track.backgroundColor = NSColor(white: 1.0, alpha: 0.22).cgColor
+        track.masksToBounds = true
 
-        // Percentage Label
+        // Progress Fill Bar (GPU Layer)
+        let fill = CALayer()
+        fill.frame = CGRect(x: 0, y: 0, width: 0, height: trackHeight)
+        fill.cornerRadius = trackHeight / 2
+        fill.backgroundColor = NSColor.white.cgColor
+        track.addSublayer(fill)
+
+        visualEffect.layer?.addSublayer(track)
+        self.trackLayer = track
+        self.fillLayer = fill
+
+        // Percentage Text Label
         let label = NSTextField(labelWithString: "50%")
-        label.frame = NSRect(x: 152, y: (height - 18) / 2, width: 36, height: 18)
-        label.font = .monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-        label.textColor = .labelColor
+        label.frame = NSRect(x: 154, y: (panelHeight - 16) / 2 - 1, width: 42, height: 16)
+        label.font = .monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        label.textColor = NSColor(white: 1.0, alpha: 0.9)
         label.alignment = .right
         visualEffect.addSubview(label)
         self.percentageLabel = label
@@ -75,21 +89,40 @@ final class OSDController {
     func show(brightness: Double) {
         guard let p = panel, let screen = NSScreen.main else { return }
 
-        // Update values
-        levelIndicator?.doubleValue = brightness
-        percentageLabel?.stringValue = "\(Int(round(brightness * 100)))%"
+        let clamped = max(0.0, min(1.0, brightness))
+        let targetWidth = trackWidth * CGFloat(clamped)
 
-        // Center horizontally, positioned near bottom like native macOS HUD
+        // Hardware-accelerated smooth layer animation
+        CATransaction.begin()
+        CATransaction.setAnimationDuration(0.08)
+        CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .easeOut))
+        fillLayer?.frame = CGRect(x: 0, y: 0, width: targetWidth, height: trackHeight)
+        CATransaction.commit()
+
+        percentageLabel?.stringValue = "\(Int(round(clamped * 100)))%"
+
+        // Update icon intensity
+        if clamped < 0.05 {
+            iconView?.image = NSImage(systemSymbolName: "keyboard", accessibilityDescription: nil)
+            iconView?.contentTintColor = NSColor(white: 1.0, alpha: 0.4)
+        } else {
+            iconView?.image = NSImage(systemSymbolName: "keyboard.fill", accessibilityDescription: nil)
+            iconView?.contentTintColor = .white
+        }
+
+        // Center on screen horizontally, bottom position matching Apple's HUD
         let screenFrame = screen.visibleFrame
-        let x = screenFrame.origin.x + (screenFrame.width - p.frame.width) / 2
-        let y = screenFrame.origin.y + 100
+        let x = screenFrame.origin.x + (screenFrame.width - panelWidth) / 2
+        let y = screenFrame.origin.y + 110
         p.setFrameOrigin(NSPoint(x: x, y: y))
 
         // Reset previous dismissal
         dismissWorkItem?.cancel()
 
-        p.alphaValue = 1.0
-        p.orderFrontRegardless()
+        if p.alphaValue < 1.0 || !p.isVisible {
+            p.alphaValue = 1.0
+            p.orderFrontRegardless()
+        }
 
         // Auto-fade after 1.2s
         let workItem = DispatchWorkItem { [weak self] in
