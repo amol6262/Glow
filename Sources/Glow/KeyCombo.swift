@@ -1,7 +1,7 @@
 import Carbon.HIToolbox
 import AppKit
 
-/// Utilities for displaying and converting key combinations.
+/// Utilities for displaying, recording, and translating keyboard keys and modifiers.
 enum KeyCombo {
 
     // MARK: - Display
@@ -16,7 +16,7 @@ enum KeyCombo {
         return parts.joined()
     }
 
-    // MARK: - Conversion
+    // MARK: - Modifier Translation
 
     static func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
         var mods: UInt32 = 0
@@ -27,11 +27,10 @@ enum KeyCombo {
         return mods
     }
 
-    // MARK: - Key names
+    // MARK: - Key Names
 
-    // swiftlint:disable:next cyclomatic_complexity function_body_length
     static func keyName(for code: UInt32) -> String {
-        switch Int(code) {
+        return switch Int(code) {
         // Letters
         case kVK_ANSI_A: "A"
         case kVK_ANSI_B: "B"
@@ -72,7 +71,7 @@ enum KeyCombo {
         case kVK_ANSI_8: "8"
         case kVK_ANSI_9: "9"
 
-        // Punctuation and symbols
+        // Symbols
         case kVK_ANSI_Minus: "-"
         case kVK_ANSI_Equal: "="
         case kVK_ANSI_LeftBracket: "["
@@ -85,7 +84,7 @@ enum KeyCombo {
         case kVK_ANSI_Backslash: "\\"
         case kVK_ANSI_Grave: "`"
 
-        // Special keys
+        // Special Keys
         case kVK_Return: "↩"
         case kVK_Tab: "⇥"
         case kVK_Space: "Space"
@@ -93,19 +92,19 @@ enum KeyCombo {
         case kVK_ForwardDelete: "⌦"
         case kVK_Escape: "⎋"
 
-        // Arrow keys
+        // Arrows
         case kVK_LeftArrow: "←"
         case kVK_RightArrow: "→"
         case kVK_UpArrow: "↑"
         case kVK_DownArrow: "↓"
 
         // Navigation
-        case kVK_Home: "↖"
-        case kVK_End: "↘"
-        case kVK_PageUp: "⇞"
-        case kVK_PageDown: "⇟"
+        case kVK_Home: "Home"
+        case kVK_End: "End"
+        case kVK_PageUp: "PageUp"
+        case kVK_PageDown: "PageDown"
 
-        // Function keys
+        // Function Keys
         case kVK_F1: "F1"
         case kVK_F2: "F2"
         case kVK_F3: "F3"
@@ -127,7 +126,8 @@ enum KeyCombo {
         case kVK_F19: "F19"
         case kVK_F20: "F20"
 
-        default: "Key\(code)"
+        default:
+            "Key(\(code))"
         }
     }
 }

@@ -1,58 +1,72 @@
-import IOKit
+import Foundation
 
-/// Reads and writes the built-in keyboard backlight brightness via IOKit.
-enum KeyboardBrightness {
+/// Controls the built-in keyboard backlight brightness via CoreBrightness framework.
+@MainActor
+final class KeyboardBrightness {
+    static let shared = KeyboardBrightness()
 
-    /// Returns the current keyboard brightness (0.0–1.0) and whether the backlight is available.
-    static func get() -> (available: Bool, value: Float) {
-        var iterator: io_iterator_t = 0
-        let result = IOServiceGetMatchingServices(
-            kIOMainPortDefault,
-            IOServiceMatching("AppleHIDKeyboardEventDriverV2"),
-            &iterator
-        )
-        guard result == KERN_SUCCESS else { return (false, 0) }
-        defer { IOObjectRelease(iterator) }
+    private var client: AnyObject?
+    private var getBrightnessFunc: (@convention(c) (AnyObject, Selector, UInt64) -> Float)?
+    private var setBrightnessFunc: (@convention(c) (AnyObject, Selector, Float, UInt64) -> Bool)?
+    private var getSel: Selector?
+    private var setSel: Selector?
+    private(set) var keyboardID: UInt64?
 
-        var service = IOIteratorNext(iterator)
-        while service != IO_OBJECT_NULL {
-            if let prop = IORegistryEntryCreateCFProperty(
-                service,
-                "KeyboardBacklightBrightness" as CFString,
-                kCFAllocatorDefault,
-                0
-            )?.takeRetainedValue() as? NSNumber {
-                let value = prop.floatValue
-                IOObjectRelease(service)
-                return (true, value)
-            }
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
+    private init() {
+        dlopen("/System/Library/PrivateFrameworks/CoreBrightness.framework/CoreBrightness", RTLD_NOW)
+        guard let cls = NSClassFromString("KeyboardBrightnessClient") as? NSObject.Type else {
+            return
         }
-        return (false, 0)
+
+        let clientInstance = cls.init()
+        self.client = clientInstance
+
+        let getSelector = NSSelectorFromString("brightnessForKeyboard:")
+        let setSelector = NSSelectorFromString("setBrightness:forKeyboard:")
+        self.getSel = getSelector
+        self.setSel = setSelector
+
+        let impGet = clientInstance.method(for: getSelector)
+        self.getBrightnessFunc = unsafeBitCast(
+            impGet,
+            to: (@convention(c) (AnyObject, Selector, UInt64) -> Float).self
+        )
+
+        let impSet = clientInstance.method(for: setSelector)
+        self.setBrightnessFunc = unsafeBitCast(
+            impSet,
+            to: (@convention(c) (AnyObject, Selector, Float, UInt64) -> Bool).self
+        )
+
+        if let ids = clientInstance.perform(NSSelectorFromString("copyKeyboardBacklightIDs"))?.takeRetainedValue() as? [NSNumber],
+           let firstID = ids.first {
+            self.keyboardID = firstID.uint64Value
+        }
     }
 
-    /// Sets the keyboard backlight brightness (clamped to 0.0–1.0).
-    static func set(_ value: Float) {
-        var iterator: io_iterator_t = 0
-        let result = IOServiceGetMatchingServices(
-            kIOMainPortDefault,
-            IOServiceMatching("AppleHIDKeyboardEventDriverV2"),
-            &iterator
-        )
-        guard result == KERN_SUCCESS else { return }
-        defer { IOObjectRelease(iterator) }
+    var isAvailable: Bool {
+        client != nil && keyboardID != nil
+    }
 
-        let clamped = max(0, min(1, value)) as NSNumber
-        var service = IOIteratorNext(iterator)
-        while service != IO_OBJECT_NULL {
-            IORegistryEntrySetCFProperty(
-                service,
-                "KeyboardBacklightBrightness" as CFString,
-                clamped
-            )
-            IOObjectRelease(service)
-            service = IOIteratorNext(iterator)
+    func get() -> Float {
+        guard let client = client,
+              let getFunc = getBrightnessFunc,
+              let sel = getSel,
+              let id = keyboardID else {
+            return 0
         }
+        return getFunc(client, sel, id)
+    }
+
+    @discardableResult
+    func set(_ value: Float) -> Bool {
+        guard let client = client,
+              let setFunc = setBrightnessFunc,
+              let sel = setSel,
+              let id = keyboardID else {
+            return false
+        }
+        let clamped = max(0.0, min(1.0, value))
+        return setFunc(client, sel, clamped, id)
     }
 }

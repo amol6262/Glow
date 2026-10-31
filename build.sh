@@ -23,6 +23,10 @@ mkdir -p "${APP_BUNDLE}/Contents/Resources"
 
 cp "${BINARY}" "${APP_BUNDLE}/Contents/MacOS/${APP_NAME}"
 
+if [ -f "Resources/AppIcon.icns" ]; then
+    cp "Resources/AppIcon.icns" "${APP_BUNDLE}/Contents/Resources/AppIcon.icns"
+fi
+
 sed -e "s/\${BUNDLE_ID}/${BUNDLE_ID}/g" \
     -e "s/\${APP_NAME}/${APP_NAME}/g" \
     Info.plist.in > "${APP_BUNDLE}/Contents/Info.plist"

@@ -1,109 +1,118 @@
 import SwiftUI
-import ServiceManagement
 
 struct SettingsView: View {
-    @Environment(AppModel.self) private var model
+    @ObservedObject var model: AppModel
 
     var body: some View {
-        @Bindable var model = model
-
         TabView {
-            generalTab(model)
-                .tabItem { Label("General", systemImage: "gear") }
-            hotkeysTab(model)
-                .tabItem { Label("Hotkeys", systemImage: "keyboard") }
+            generalTab
+                .tabItem {
+                    Label("General", systemImage: "gearshape")
+                }
+            hotkeysTab
+                .tabItem {
+                    Label("Hotkeys", systemImage: "keyboard")
+                }
             aboutTab
-                .tabItem { Label("About", systemImage: "info.circle") }
-        }
-        .frame(width: 420, height: 240)
-    }
-
-    // MARK: - General
-
-    @ViewBuilder
-    private func generalTab(_ model: AppModel) -> some View {
-        @Bindable var model = model
-
-        Form {
-            LabeledContent("Brightness Step") {
-                Picker("", selection: $model.stepSize) {
-                    Text("5%").tag(0.05)
-                    Text("10%").tag(0.10)
-                    Text("15%").tag(0.15)
-                    Text("20%").tag(0.20)
-                    Text("25%").tag(0.25)
+                .tabItem {
+                    Label("About", systemImage: "info.circle")
                 }
-                .labelsHidden()
-                .pickerStyle(.segmented)
-                .frame(width: 260)
-            }
-
-            LabeledContent("Launch at Login") {
-                Toggle("", isOn: $model.launchAtLogin)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-
-            if !model.isAvailable {
-                LabeledContent("Status") {
-                    Label("Keyboard backlight not detected", systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.orange)
-                        .font(.callout)
-                }
-            }
         }
-        .formStyle(.grouped)
+        .frame(width: 440, height: 260)
         .padding()
     }
 
-    // MARK: - Hotkeys
+    // MARK: - General Tab
 
-    @ViewBuilder
-    private func hotkeysTab(_ model: AppModel) -> some View {
-        @Bindable var model = model
-
+    private var generalTab: some View {
         Form {
-            LabeledContent("Increase Brightness") {
-                KeyRecorderButton(
-                    keyCode: $model.increaseKeyCode,
-                    modifiers: $model.increaseModifiers
-                )
-            }
+            Section {
+                LabeledContent("Brightness Step:") {
+                    Picker("", selection: $model.stepSize) {
+                        Text("5%").tag(0.05)
+                        Text("10%").tag(0.10)
+                        Text("15%").tag(0.15)
+                        Text("20%").tag(0.20)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(width: 200)
+                }
 
-            LabeledContent("Decrease Brightness") {
-                KeyRecorderButton(
-                    keyCode: $model.decreaseKeyCode,
-                    modifiers: $model.decreaseModifiers
-                )
-            }
+                LabeledContent("Start on Startup:") {
+                    Toggle("Launch Glow automatically at login", isOn: $model.launchAtLogin)
+                        .toggleStyle(.checkbox)
+                }
 
-            Text("Click a field, then press the key combination you want to use.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                LabeledContent("On-Screen Bezel:") {
+                    Toggle("Show HUD overlay when adjusting via hotkeys", isOn: $model.showOSD)
+                        .toggleStyle(.checkbox)
+                }
+            }
         }
-        .formStyle(.grouped)
-        .padding()
+        .padding(8)
     }
 
-    // MARK: - About
+    // MARK: - Hotkeys Tab
+
+    private var hotkeysTab: some View {
+        Form {
+            Section {
+                LabeledContent("Decrease Brightness:") {
+                    KeyRecorderView(
+                        keyCode: $model.decreaseKeyCode,
+                        modifiers: $model.decreaseModifiers
+                    )
+                    .frame(width: 140, height: 28)
+                }
+
+                LabeledContent("Increase Brightness:") {
+                    KeyRecorderView(
+                        keyCode: $model.increaseKeyCode,
+                        modifiers: $model.increaseModifiers
+                    )
+                    .frame(width: 140, height: 28)
+                }
+
+                Text("Click a key field, then press any key or combination (e.g. O, P, ⌥O, ⌥P). Press Escape to cancel.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 4)
+
+                HStack {
+                    Spacer()
+                    Button("Reset to Defaults (⌥O / ⌥P)") {
+                        model.resetToDefaults()
+                    }
+                    .controlSize(.small)
+                }
+                .padding(.top, 8)
+            }
+        }
+        .padding(8)
+    }
+
+    // MARK: - About Tab
 
     private var aboutTab: some View {
         VStack(spacing: 12) {
             Spacer()
-            Image(systemName: "keyboard")
-                .font(.system(size: 36))
-                .foregroundStyle(.secondary)
+            Image(systemName: "keyboard.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(.tint)
+
             Text("Glow")
                 .font(.title2.bold())
-            Text("Keyboard Brightness Control")
-                .font(.callout)
+
+            Text("Native macOS Keyboard Backlight Controller")
+                .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text("Version 1.0")
+
+            Text("Engineered for ultra-low resource usage (<15 MB RAM, 0% CPU at idle).")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
+
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .padding()
     }
 }

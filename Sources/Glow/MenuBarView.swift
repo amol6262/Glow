@@ -1,118 +1,133 @@
 import SwiftUI
 
 struct MenuBarView: View {
-    @Environment(AppModel.self) private var model
+    @ObservedObject var model: AppModel
+    var onOpenSettings: () -> Void
+    var onQuit: () -> Void
 
     var body: some View {
         VStack(spacing: 12) {
-            // Header
+            // Header: Title + Current Percentage
             HStack(spacing: 8) {
-                Image(systemName: brightnessIcon)
-                    .font(.title3)
+                Image(systemName: "keyboard.fill")
+                    .font(.system(size: 15))
                     .foregroundStyle(.secondary)
                 Text("Keyboard Brightness")
                     .font(.headline)
                 Spacer()
-                Text("\(Int(model.brightness * 100))%")
+                Text("\(Int(round(model.brightness * 100)))%")
                     .font(.title3.monospacedDigit())
-                    .fontWeight(.medium)
-                    .foregroundStyle(.primary)
+                    .fontWeight(.semibold)
             }
 
             // Slider
             HStack(spacing: 8) {
                 Image(systemName: "sun.min")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
                 Slider(
-                    value: brightnessBinding,
-                    in: 0...1,
-                    step: model.stepSize
+                    value: Binding(
+                        get: { model.brightness },
+                        set: { model.setBrightness($0, triggerOSD: false) }
+                    ),
+                    in: 0.0...1.0
                 )
                 .controlSize(.small)
-                Image(systemName: "sun.max")
+                Image(systemName: "sun.max.fill")
                     .font(.caption)
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(.secondary)
+            }
+
+            // Preset Buttons
+            HStack(spacing: 6) {
+                presetButton(title: "Off", value: 0.0)
+                presetButton(title: "25%", value: 0.25)
+                presetButton(title: "50%", value: 0.50)
+                presetButton(title: "75%", value: 0.75)
+                presetButton(title: "100%", value: 1.0)
             }
 
             if !model.isAvailable {
-                Label("Keyboard backlight not detected", systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text("Keyboard backlight not detected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.top, 2)
             }
 
             Divider()
 
-            // Hotkey hints
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    hotkeyHint(
-                        label: "Increase",
-                        keyCode: model.increaseKeyCode,
-                        modifiers: model.increaseModifiers
-                    )
-                    hotkeyHint(
-                        label: "Decrease",
-                        keyCode: model.decreaseKeyCode,
-                        modifiers: model.decreaseModifiers
-                    )
+            // Active Shortcuts Info
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Decrease Brightness:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(KeyCombo.displayString(keyCode: model.decreaseKeyCode, modifiers: model.decreaseModifiers))
+                        .font(.caption.monospaced())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
                 }
-                Spacer()
+                HStack {
+                    Text("Increase Brightness:")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(KeyCombo.displayString(keyCode: model.increaseKeyCode, modifiers: model.increaseModifiers))
+                        .font(.caption.monospaced())
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.secondary.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                }
             }
 
             Divider()
 
             // Footer
             HStack {
-                SettingsLink {
-                    Label("Settings…", systemImage: "gear")
+                Button(action: onOpenSettings) {
+                    Label("Settings…", systemImage: "gearshape")
+                        .font(.subheadline)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary)
 
                 Spacer()
 
-                Button(action: { NSApplication.shared.terminate(nil) }) {
+                Button(action: onQuit) {
                     Text("Quit Glow")
+                        .font(.subheadline)
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
-            .font(.caption)
         }
         .padding(16)
-        .frame(width: 260)
-        .onAppear {
-            model.refreshBrightness()
-        }
+        .frame(width: 280)
     }
 
-    // MARK: - Helpers
-
-    private var brightnessBinding: Binding<Double> {
-        Binding(
-            get: { model.brightness },
-            set: { model.setBrightness($0) }
-        )
-    }
-
-    private var brightnessIcon: String {
-        if model.brightness > 0.66 { return "light.max" }
-        if model.brightness > 0.33 { return "light.min" }
-        return "light.min"
-    }
-
-    private func hotkeyHint(label: String, keyCode: UInt32, modifiers: UInt32) -> some View {
-        HStack(spacing: 4) {
-            Text(label)
+    private func presetButton(title: String, value: Double) -> some View {
+        Button(action: {
+            model.setBrightness(value, triggerOSD: false)
+        }) {
+            Text(title)
                 .font(.caption)
-                .foregroundStyle(.tertiary)
-            Text(KeyCombo.displayString(keyCode: keyCode, modifiers: modifiers))
-                .font(.caption.monospaced())
-                .padding(.horizontal, 4)
-                .padding(.vertical, 1)
-                .background(Color.secondary.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 4)
+                .background(
+                    abs(model.brightness - value) < 0.03
+                        ? Color.accentColor.opacity(0.25)
+                        : Color.secondary.opacity(0.08)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 5))
         }
+        .buttonStyle(.plain)
     }
 }

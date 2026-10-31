@@ -1,6 +1,7 @@
 import Carbon.HIToolbox
+import Foundation
 
-/// Manages global hotkeys via Carbon's RegisterEventHotKey.
+/// Manages global system hotkeys using Carbon's RegisterEventHotKey.
 @MainActor
 final class HotkeyManager {
     static let shared = HotkeyManager()
@@ -10,14 +11,14 @@ final class HotkeyManager {
     private var increaseRef: EventHotKeyRef?
     private var decreaseRef: EventHotKeyRef?
 
-    /// 'GLOW' as a four-char code for the hotkey signature.
+    /// 'GLOW' as a four-char OSType signature.
     private let signature: OSType = 0x474C_4F57
 
     private init() {
-        installHandler()
+        installCarbonHandler()
     }
 
-    // MARK: - Public
+    // MARK: - Configuration
 
     func setup(onIncrease: @escaping () -> Void, onDecrease: @escaping () -> Void) {
         self.onIncrease = onIncrease
@@ -32,9 +33,18 @@ final class HotkeyManager {
         let id = EventHotKeyID(signature: signature, id: 1)
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
-            keyCode, modifiers, id,
-            GetApplicationEventTarget(), 0, &ref)
-        if status == noErr { increaseRef = ref }
+            keyCode,
+            modifiers,
+            id,
+            GetApplicationEventTarget(),
+            0,
+            &ref
+        )
+        if status == noErr {
+            increaseRef = ref
+        } else {
+            print("Glow: Warning - Failed to register increase hotkey (code: \(status))")
+        }
     }
 
     func registerDecrease(keyCode: UInt32, modifiers: UInt32) {
@@ -45,24 +55,36 @@ final class HotkeyManager {
         let id = EventHotKeyID(signature: signature, id: 2)
         var ref: EventHotKeyRef?
         let status = RegisterEventHotKey(
-            keyCode, modifiers, id,
-            GetApplicationEventTarget(), 0, &ref)
-        if status == noErr { decreaseRef = ref }
+            keyCode,
+            modifiers,
+            id,
+            GetApplicationEventTarget(),
+            0,
+            &ref
+        )
+        if status == noErr {
+            decreaseRef = ref
+        } else {
+            print("Glow: Warning - Failed to register decrease hotkey (code: \(status))")
+        }
     }
 
-    // MARK: - Internal
+    // MARK: - Event Dispatch
 
     func fire(_ id: UInt32) {
         switch id {
-        case 1: onIncrease?()
-        case 2: onDecrease?()
-        default: break
+        case 1:
+            onIncrease?()
+        case 2:
+            onDecrease?()
+        default:
+            break
         }
     }
 
     // MARK: - Private
 
-    private func installHandler() {
+    private func installCarbonHandler() {
         var spec = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
