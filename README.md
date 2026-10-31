@@ -30,7 +30,7 @@ A lightweight, professional macOS utility that gives you instant keyboard backli
 
 ### Option 1: Download Pre-built DMG (Recommended)
 
-1. Download the latest **[`Glow.dmg`](https://github.com/amolt1205/Glow/releases/latest)** from the [Releases](https://github.com/amolt1205/Glow/releases) section.
+1. Download the latest **[`Glow.dmg`](https://github.com/amol6262/Glow/releases/latest)** from the [Releases](https://github.com/amol6262/Glow/releases) section.
 2. Open `Glow.dmg`.
 3. Drag **Glow** into your **Applications** folder.
 4. Launch **Glow** from `/Applications` or Spotlight (`⌘ Space`).
@@ -62,7 +62,7 @@ To assign custom keys:
 
 ### Build the App
 ```bash
-git clone https://github.com/amolt1205/Glow.git
+git clone https://github.com/amol6262/Glow.git
 cd Glow
 ./build.sh --open
 ```
